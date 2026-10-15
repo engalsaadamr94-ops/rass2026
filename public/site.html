@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#1c3d6b">
+<title>معاينة موقعية — رسس</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/logo.png">
+<style>
+:root{--navy:#1c3d6b;--bg:#f5f7fb;--card:#fff;--ink:#14213d;--mut:#667085;--bd:#d7deea;--ok:#067647;--bad:#b42318;--warn:#b54708}
+@media(prefers-color-scheme:dark){:root{--bg:#10151f;--card:#18202d;--ink:#e8edf6;--mut:#9aa7bd;--bd:#2b3648;--navy:#6fa0e6}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:"IBM Plex Sans Arabic",system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;line-height:1.6}
+header{background:var(--navy);color:#fff;padding:14px 16px;display:flex;align-items:center;gap:10px}
+header h1{font-size:17px;margin:0;flex:1}
+.st{font-size:12px;padding:3px 10px;border-radius:99px;background:rgba(255,255,255,.18)}
+main{max-width:720px;margin:0 auto;padding:14px 16px 90px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:12px}
+h2{font-size:15px;margin:0 0 10px}
+label{display:block;font-size:12.5px;color:var(--mut);margin-bottom:10px}
+input,select,textarea{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:10px;margin-top:4px}
+textarea{min-height:80px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.ln{display:grid;grid-template-columns:1fr 74px 78px 38px;gap:6px;margin-bottom:8px;align-items:end}
+.ln input,.ln select{margin-top:0}
+button{font:inherit;border:1px solid var(--bd);background:var(--card);color:var(--ink);padding:10px 14px;border-radius:9px;cursor:pointer}
+button.pri{background:var(--navy);color:#fff;border-color:var(--navy)}
+button.sm{padding:6px 10px;font-size:13px}button.bad{color:var(--bad)}button:disabled{opacity:.5;cursor:not-allowed}
+.d{display:flex;gap:8px;align-items:center;justify-content:space-between;border-bottom:1px solid var(--bd);padding:8px 0}.d:last-child{border:0}
+.d small{color:var(--mut);display:block}
+.note{font-size:12px;color:var(--mut)}
+.bar{position:fixed;inset-inline:0;bottom:0;background:var(--card);border-top:1px solid var(--bd);padding:10px 16px;display:flex;gap:8px;justify-content:center}
+#msg{position:fixed;top:60px;inset-inline:16px;max-width:560px;margin:auto;background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:10px;display:none;z-index:9}
+</style>
+</head>
+<body>
+<header><h1>معاينة موقعية</h1><span class="st" id="net">…</span><a href="/" style="color:#fff;font-size:13px">النظام</a></header>
+<div id="msg" role="status"></div>
+<main>
+  <div class="card note">اكتب بيانات المعاينة هنا حتى دون اتصال بالإنترنت؛ تُحفظ في هذا الجهاز، وعند توفر الاتصال والدخول إلى النظام ارفعها كمسودة عرض سعر تُسعَّر لاحقاً من المكتبة. الصور غير مدعومة في هذه النسخة.</div>
+  <div class="card">
+    <h2>بيانات المعاينة</h2>
+    <label>المشروع<input id="project" autocomplete="off"></label>
+    <label>العميل / الجهة<input id="client" autocomplete="off"></label>
+    <label>الموقع<input id="location" autocomplete="off"></label>
+    <label>تاريخ المعاينة<input id="date" type="date"></label>
+  </div>
+  <div class="card">
+    <h2>البنود والكميات</h2>
+    <div id="lines"></div>
+    <button type="button" id="addLine">+ إضافة بند</button>
+  </div>
+  <div class="card">
+    <h2>ملاحظات الموقع</h2>
+    <label>ملاحظات (طبيعة المبنى، الارتفاعات، العوائق، المتطلبات…)<textarea id="notes"></textarea></label>
+  </div>
+  <div class="card">
+    <h2>المسودات المحفوظة على هذا الجهاز <span class="note" id="cnt"></span></h2>
+    <div id="drafts"><div class="note">لا توجد مسودات.</div></div>
+  </div>
+</main>
+<div class="bar"><button class="pri" id="save" type="button">حفظ المسودة</button><button type="button" id="fresh">مسودة جديدة</button></div>
+<script>
+(function () {
+  'use strict';
+  var KEY = 'rass.site.drafts.v1', CUR = 'rass.site.current.v1';
+  var $ = function (s) { return document.querySelector(s); };
+  var uid = function () { return Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4); };
+  var today = function () { return new Date().toISOString().slice(0, 10); };
+  var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+  var read = function (k, d) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } };
+  var write = function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { toast('تعذر الحفظ على الجهاز (المساحة ممتلئة أو التخزين معطّل)'); return false; } };
+  var cur = read(CUR, null) || blank();
+  function blank() { return { id: uid(), project: '', client: '', location: '', date: today(), notes: '', lines: [{ id: uid(), desc: '', qty: 1, unit: 'NO' }] }; }
+  function toast(t) { var m = $('#msg'); m.textContent = t; m.style.display = 'block'; clearTimeout(toast.t); toast.t = setTimeout(function () { m.style.display = 'none'; }, 3500); }
+  function net() { var on = navigator.onLine; $('#net').textContent = on ? 'متصل' : 'غير متصل'; drafts(); }
+  window.addEventListener('online', net); window.addEventListener('offline', net);
+
+  function draw() {
+    ['project', 'client', 'location', 'date', 'notes'].forEach(function (k) { $('#' + k).value = cur[k] || ''; });
+    $('#lines').innerHTML = cur.lines.map(function (l, i) { return '<div class="ln" data-i="' + i + '"><label style="margin:0">الوصف<input data-k="desc" value="' + esc(l.desc) + '" placeholder="مثال: كاشف دخان"></label><label style="margin:0">الكمية<input data-k="qty" type="number" inputmode="decimal" min="0" step="any" value="' + esc(l.qty) + '"></label><label style="margin:0">الوحدة<select data-k="unit">' + ['NO', 'M', 'LS', 'SET'].map(function (u) { return '<option ' + (l.unit === u ? 'selected' : '') + '>' + u + '</option>'; }).join('') + '</select></label><button type="button" class="sm bad" data-rm="' + i + '" aria-label="حذف">✕</button></div>'; }).join('');
+  }
+  function drafts() {
+    var ds = read(KEY, []); $('#cnt').textContent = ds.length ? '(' + ds.length + ')' : '';
+    $('#drafts').innerHTML = ds.length ? ds.map(function (d) { return '<div class="d" data-id="' + d.id + '"><div><b>' + esc(d.project || 'بدون مشروع') + '</b><small>' + esc(d.client || '') + ' · ' + esc(d.date) + ' · ' + d.lines.filter(function (l) { return l.desc; }).length + ' بند</small></div><div class="row"><button class="sm" data-act="edit" type="button">فتح</button><button class="sm pri" data-act="up" type="button" ' + (navigator.onLine ? '' : 'disabled') + '>رفع</button><button class="sm bad" data-act="del" type="button">حذف</button></div></div>'; }).join('') : '<div class="note">لا توجد مسودات.</div>';
+  }
+  function store() { write(CUR, cur); }
+  function saveDraft(silent) {
+    var ds = read(KEY, []), i = ds.findIndex(function (d) { return d.id === cur.id; }); var copy = JSON.parse(JSON.stringify(cur));
+    if (i >= 0) ds[i] = copy; else ds.unshift(copy); if (write(KEY, ds)) { drafts(); if (!silent) toast('حُفظت المسودة على هذا الجهاز'); }
+  }
+  document.addEventListener('input', function (e) {
+    var t = e.target; if (t.id && cur.hasOwnProperty(t.id) && t.id !== 'lines') cur[t.id] = t.value;
+    else if (t.dataset.k) { var ln = t.closest('.ln'), l = cur.lines[+ln.dataset.i]; l[t.dataset.k] = t.dataset.k === 'qty' ? Number(t.value) || 0 : t.value; }
+    store();
+  });
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    if (b.id === 'addLine') { cur.lines.push({ id: uid(), desc: '', qty: 1, unit: 'NO' }); store(); draw(); var inp = document.querySelectorAll('#lines [data-k=desc]'); inp[inp.length - 1].focus(); }
+    else if (b.dataset.rm != null) { cur.lines.splice(+b.dataset.rm, 1); if (!cur.lines.length) cur.lines.push({ id: uid(), desc: '', qty: 1, unit: 'NO' }); store(); draw(); }
+    else if (b.id === 'save') saveDraft();
+    else if (b.id === 'fresh') { saveDraft(true); cur = blank(); store(); draw(); toast('مسودة جديدة'); }
+    else if (b.dataset.act) {
+      var id = b.closest('.d').dataset.id, ds = read(KEY, []), d = ds.filter(function (x) { return x.id === id; })[0]; if (!d) return;
+      if (b.dataset.act === 'edit') { cur = JSON.parse(JSON.stringify(d)); store(); draw(); window.scrollTo(0, 0); }
+      else if (b.dataset.act === 'del') { if (!b.dataset.sure) { b.dataset.sure = 1; b.textContent = 'تأكيد'; setTimeout(function () { if (b.isConnected) { b.textContent = 'حذف'; delete b.dataset.sure; } }, 3000); return; } write(KEY, ds.filter(function (x) { return x.id !== id; })); drafts(); }
+      else upload(d, b);
+    }
+  });
+  function upload(d, b) {
+    var lines = d.lines.filter(function (l) { return l.desc.trim(); }); if (!lines.length) return toast('أضف بنداً واحداً على الأقل قبل الرفع');
+    b.disabled = true; var H = { 'Content-Type': 'application/json', 'X-Requested-With': 'rass' };
+    fetch('/api/bootstrap', { headers: H, credentials: 'same-origin' }).then(function (r) { if (r.status === 401) { throw new Error('login'); } return r.json(); }).then(function (bs) {
+      var s = bs.settings || {}, q = { id: uid() + uid().slice(0, 4), client: d.client || 'عميل', custId: '', project: d.project, location: d.location, date: d.date || today(), validity: s.validity || 30, preparedBy: s.preparedBy || '', status: 'draft', rev: 1,
+        lines: lines.map(function (l) { return { id: uid(), group: 'بنود المعاينة', desc: l.desc.trim(), brand: '', unit: l.unit || 'NO', qty: l.qty || 1, price: 0 }; }), discMode: 'pct', discPct: 0, discAmt: 0, vatRate: s.vatRate || 15, notes: ('معاينة موقعية بتاريخ ' + d.date + (d.notes ? '\n' + d.notes : '')).slice(0, 5000) };
+      return fetch('/api/quotes', { method: 'POST', headers: H, credentials: 'same-origin', body: JSON.stringify({ quote: q, numbering: 'counter' }) }).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || 'تعذر الرفع'); return j; }); });
+    }).then(function (j) { write(KEY, read(KEY, []).filter(function (x) { return x.id !== d.id; })); if (cur.id === d.id) { cur = blank(); store(); draw(); } drafts(); toast('رُفعت كمسودة عرض رقم ' + j.quote.no + ' — أكمل التسعير من النظام'); })
+      .catch(function (e) { b.disabled = false; toast(e.message === 'login' ? 'سجّل الدخول إلى النظام أولاً ثم أعد الرفع' : (e.message || 'تعذر الرفع')); });
+  }
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(function () { /* optional */ });
+  draw(); net();
+})();
+</script>
+</body>
+</html>
