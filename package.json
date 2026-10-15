@@ -1,0 +1,49 @@
+{
+  "name": "rass-quotes-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "عروض أسعار وعقود وتحصيل - شركة رسس للمقاولات العامة",
+  "scripts": {
+    "prep": "node scripts/prep.mjs",
+    "migrate": "node scripts/migrate.mjs",
+    "dev": "npm run prep && next dev",
+    "build": "npm run prep && node scripts/migrate.mjs && next build",
+    "start": "next start",
+    "test:e2e": "node scripts/e2e.mjs"
+  },
+  "dependencies": {
+    "@fontsource/almarai": "^5.3.0",
+    "@fontsource/amiri": "^5.3.0",
+    "@fontsource/cairo": "^5.3.0",
+    "@fontsource/el-messiri": "^5.3.0",
+    "@fontsource/ibm-plex-sans-arabic": "^5.3.0",
+    "@fontsource/noto-kufi-arabic": "^5.3.0",
+    "@fontsource/noto-naskh-arabic": "^5.3.0",
+    "@fontsource/tajawal": "^5.3.0",
+    "@mlightcad/libredwg-web": "^0.8.0",
+    "bcryptjs": "2.4.3",
+    "dxf-parser": "^1.1.2",
+    "jose": "5.9.6",
+    "next": "15.5.28",
+    "nodemailer": "6.9.16",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^4.10.38",
+    "pg": "8.13.1",
+    "qrcode-generator": "^2.0.4",
+    "react": "19.1.10",
+    "react-dom": "19.1.10"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "2.4.6",
+    "@types/node": "22.10.2",
+    "@types/nodemailer": "6.4.17",
+    "@types/pg": "8.11.10",
+    "@types/react": "19.1.0",
+    "@types/react-dom": "19.1.0",
+    "esbuild": "^0.28.2",
+    "typescript": "5.9.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
